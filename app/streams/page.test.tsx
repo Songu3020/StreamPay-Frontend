@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 const { screen } = require("@testing-library/react") as any;
 import { StreamsPageContent } from "./StreamsPageContent";
 
@@ -132,5 +132,100 @@ describe("StreamsPageContent", () => {
     
     expect(screen.getByText(/100 XLM \/ month/i)).toHaveClass("stream-row__accrued--animated");
     expect(screen.getByText(/50 XLM \/ month/i)).not.toHaveClass("stream-row__accrued--animated");
+  });
+});
+
+describe("Density toggle", () => {
+  it("renders the density toggle with both options", () => {
+    render(<StreamsPageContent state="populated" />);
+
+    const radiogroup = screen.getByRole("radiogroup", { name: /list density/i });
+    expect(radiogroup).toBeInTheDocument();
+
+    expect(screen.getByRole("radio", { name: /cozy/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /compact/i })).toBeInTheDocument();
+  });
+
+  it("defaults to cozy with cozy radio checked", () => {
+    render(<StreamsPageContent state="populated" />);
+
+    const cozyRadio = screen.getByRole("radio", { name: /cozy/i });
+    expect(cozyRadio).toHaveAttribute("aria-checked", "true");
+
+    const compactRadio = screen.getByRole("radio", { name: /compact/i });
+    expect(compactRadio).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("switches to compact when compact option is clicked", () => {
+    render(<StreamsPageContent state="populated" />);
+
+    fireEvent.click(screen.getByRole("radio", { name: /compact/i }));
+
+    expect(screen.getByRole("radio", { name: /compact/i })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: /cozy/i })).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("applies compact class to stream list and stream rows", () => {
+    render(<StreamsPageContent state="populated" />);
+
+    fireEvent.click(screen.getByRole("radio", { name: /compact/i }));
+
+    const list = screen.getByLabelText(/streams list/i);
+    expect(list).toHaveClass("stream-list--compact");
+
+    const rows = screen.getAllByRole("article");
+    for (const row of rows) {
+      expect(row).toHaveClass("stream-row--compact");
+    }
+  });
+
+  it("reverts to cozy when cozy option is clicked after compact", () => {
+    render(<StreamsPageContent state="populated" />);
+
+    fireEvent.click(screen.getByRole("radio", { name: /compact/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /cozy/i }));
+
+    expect(screen.getByRole("radio", { name: /cozy/i })).toHaveAttribute("aria-checked", "true");
+
+    const list = screen.getByLabelText(/streams list/i);
+    expect(list).not.toHaveClass("stream-list--compact");
+  });
+
+  it("does not render density toggle when state is empty", () => {
+    render(<StreamsPageContent state="empty" streams={[]} />);
+
+    expect(screen.queryByRole("radiogroup", { name: /list density/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render density toggle when state is loading", () => {
+    render(<StreamsPageContent state="loading" />);
+
+    expect(screen.queryByRole("radiogroup", { name: /list density/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render density toggle when state is error", () => {
+    render(<StreamsPageContent state="error" />);
+
+    expect(screen.queryByRole("radiogroup", { name: /list density/i })).not.toBeInTheDocument();
+  });
+
+  it("persists density choice to localStorage", () => {
+    render(<StreamsPageContent state="populated" />);
+
+    fireEvent.click(screen.getByRole("radio", { name: /compact/i }));
+
+    expect(localStorage.getItem("streampay-density")).toBe("compact");
+  });
+
+  it("reads density preference from localStorage on mount", () => {
+    localStorage.setItem("streampay-density", "compact");
+
+    render(<StreamsPageContent state="populated" />);
+
+    expect(screen.getByRole("radio", { name: /compact/i })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: /cozy/i })).toHaveAttribute("aria-checked", "false");
+
+    const list = screen.getByLabelText(/streams list/i);
+    expect(list).toHaveClass("stream-list--compact");
   });
 });
