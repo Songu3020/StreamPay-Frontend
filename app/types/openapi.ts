@@ -1,5 +1,17 @@
-export type StreamStatus = "draft" | "active" | "paused" | "ended" | "withdrawn" | "cancelled";
-export type StreamAction = "start" | "pause" | "stop" | "settle" | "withdraw" | "cancel";
+export type StreamStatus =
+  | "draft"
+  | "active"
+  | "paused"
+  | "ended"
+  | "withdrawn"
+  | "cancelled";
+export type StreamAction =
+  | "start"
+  | "pause"
+  | "stop"
+  | "settle"
+  | "withdraw"
+  | "cancel";
 export type WithdrawalState = "pending" | "succeeded" | "failed";
 
 export interface WithdrawalStatus {
@@ -48,12 +60,15 @@ export interface Stream {
   schedule: string;
   status: StreamStatus;
   nextAction?: StreamAction;
-  email?: string;       // PII
-  label?: string;       // PII
-  memo?: string;        // PII
-  partnerId?: string;   // PII
+  email?: string; // PII
+  label?: string; // PII
+  memo?: string; // PII
+  partnerId?: string; // PII
   createdAt: string;
   updatedAt: string;
+  startTime?: string;
+  endTime?: string;
+  totalAmount?: string;
   settlementTxHash?: string;
   withdrawal?: WithdrawalStatus;
   /**
