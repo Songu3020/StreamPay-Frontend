@@ -88,11 +88,65 @@ describe("recentRecipients state module", () => {
 });
 
 describe("RecentRecipients component", () => {
-  it("renders nothing when there are no recent recipients", () => {
-    const { container } = render(
-      <RecentRecipients onSelect={jest.fn()} />
-    );
-    expect(container.firstChild).toBeNull();
+  describe("empty state (no recent recipients)", () => {
+    it("renders a themed empty state instead of nothing", () => {
+      render(<RecentRecipients onSelect={jest.fn()} />);
+
+      expect(screen.getByText("Recent recipients")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "No recent recipients yet" })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Addresses you send streams to will appear here for quick reuse next time."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it("uses the generic EmptyState variant (no illustration) in this compact context", () => {
+      const { container } = render(<RecentRecipients onSelect={jest.fn()} />);
+
+      expect(container.querySelector(".empty-state__illustration")).toBeNull();
+      expect(container.querySelector("svg")).toBeNull();
+    });
+
+    it("applies the compact recent-recipients-empty class alongside any forwarded className", () => {
+      const { container } = render(
+        <RecentRecipients onSelect={jest.fn()} className="my-extra-class" />
+      );
+
+      const section = container.querySelector("section.empty-state")!;
+      expect(section).toHaveClass("recent-recipients-empty");
+      expect(section).toHaveClass("my-extra-class");
+    });
+
+    it("focuses the recipient address input when the CTA is activated", () => {
+      render(
+        <div>
+          <RecentRecipients onSelect={jest.fn()} />
+          <input id="recipient" />
+        </div>
+      );
+
+      const input = document.getElementById("recipient") as HTMLInputElement;
+      expect(input).not.toHaveFocus();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Enter an address" })
+      );
+
+      expect(input).toHaveFocus();
+    });
+
+    it("does not throw when the recipient input is not present in the DOM", () => {
+      render(<RecentRecipients onSelect={jest.fn()} />);
+
+      expect(() =>
+        fireEvent.click(
+          screen.getByRole("button", { name: "Enter an address" })
+        )
+      ).not.toThrow();
+    });
   });
 
   it("renders a pill for each recent recipient", async () => {

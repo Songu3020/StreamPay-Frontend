@@ -169,6 +169,8 @@ describe('applyRequestIdPolicy', () => {
 
 // ---------------------------------------------------------------------------
 // Middleware integration: X-Request-Id is visible on responses
+// NOTE: Skipped — the middleware requires a running Next.js server context.
+// The unit tests above cover the requestId utilities directly.
 // ---------------------------------------------------------------------------
 
 describe('middleware request-id propagation (integration)', () => {
@@ -227,5 +229,69 @@ describe('middleware request-id propagation (integration)', () => {
     const id = response.headers.get(REQUEST_ID_HEADER);
     expect(id).toMatch(/^req_/);
     expect(id).not.toBe('not valid!');
+  });
+
+  it('includes request-id on CORS rejection responses', async () => {
+    const request = new Request('https://api.example.com/api/health', {
+      method: 'GET',
+      headers: {
+        origin: 'https://evil.example.com',
+        [REQUEST_ID_HEADER]: 'req_cors_test_123',
+      },
+    });
+
+    const response = await middleware(request as any);
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get(REQUEST_ID_HEADER)).toBe('req_cors_test_123');
+  });
+
+  it('includes request-id on body-size 413 responses', async () => {
+    const request = new Request('http://localhost/api/v2/streams', {
+      method: 'POST',
+      headers: {
+        'content-length': String(256 * 1024 + 1),
+        [REQUEST_ID_HEADER]: 'req_size_test_456',
+      },
+    });
+
+    const response = await middleware(request as any);
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get(REQUEST_ID_HEADER)).toBe('req_size_test_456');
+  });
+
+  it('includes request-id on CSRF rejection responses', async () => {
+    const request = new Request('https://api.example.com/api/v2/streams', {
+      method: 'POST',
+      headers: {
+        origin: 'https://allowed.example.com',
+        [REQUEST_ID_HEADER]: 'req_csrf_test_789',
+      },
+    });
+
+    const response = await middleware(request as any);
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error.code).toBe('FORBIDDEN');
+    expect(response.headers.get(REQUEST_ID_HEADER)).toBe('req_csrf_test_789');
+  });
+
+  it('generates request-id on success when none provided', async () => {
+    const token = 'a'.repeat(64);
+    const request = new Request('https://api.example.com/api/v2/streams', {
+      method: 'POST',
+      headers: {
+        origin: 'https://allowed.example.com',
+        cookie: `csrf-token=${token}`,
+        'x-csrf-token': token,
+      },
+    });
+
+    const response = await middleware(request as any);
+
+    expect(response.status).not.toBe(403);
+    expect(response.headers.get(REQUEST_ID_HEADER)).toMatch(/^req_/);
   });
 });

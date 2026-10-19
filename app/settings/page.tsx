@@ -32,7 +32,7 @@ export default function SettingsPage() {
           <div className="settings-group__header">
             <h2 className="settings-group__title">Notifications</h2>
             <p className="settings-group__description">
-              Manage instant push prompts for GrantFox and keep email fallback ready for critical stream alerts.
+              Manage instant push prompts and keep email fallback ready for critical stream alerts.
             </p>
           </div>
           <div className="settings-group__content" style={{ marginTop: '1rem' }}>

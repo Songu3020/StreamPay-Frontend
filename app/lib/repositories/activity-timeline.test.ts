@@ -1,4 +1,8 @@
-import { createActivityTimelineStore, activityEventToTimelineEntry } from "./activity-timeline";
+import {
+  activityEventToTimelineEntry,
+  createActivityTimelineStore,
+  mergeActivityTimelinePages,
+} from "./activity-timeline";
 import type { ActivityEvent } from "@/app/types/openapi";
 
 function makeEvent(overrides: Partial<ActivityEvent> & { id: string }): ActivityEvent {
@@ -142,6 +146,35 @@ describe("ActivityTimelineStore", () => {
       const result = store.query({ limit: 10 });
       expect(result.meta.hasNext).toBe(false);
       expect(result.meta.nextCursor).toBeNull();
+    });
+
+    it("does not repeat or drop same-timestamp events across pages", () => {
+      const store = createActivityTimelineStore();
+      seedEvents(store, [
+        makeEvent({ id: "evt-c", timestamp: "2026-06-01T12:00:00Z" }),
+        makeEvent({ id: "evt-b", timestamp: "2026-06-01T12:00:00Z" }),
+        makeEvent({ id: "evt-a", timestamp: "2026-06-01T12:00:00Z" }),
+      ]);
+
+      const first = store.query({ limit: 2 });
+      const second = store.query({ limit: 2, cursor: first.meta.nextCursor ?? undefined });
+
+      expect(first.data.map((event) => event.id)).toEqual(["evt-c", "evt-b"]);
+      expect(second.data.map((event) => event.id)).toEqual(["evt-a"]);
+    });
+  });
+
+  describe("mergeActivityTimelinePages", () => {
+    it("deduplicates and sorts paged timeline responses deterministically", () => {
+      const entry = (id: string, timestamp: string) =>
+        activityEventToTimelineEntry(makeEvent({ id, timestamp }), timestamp);
+
+      const merged = mergeActivityTimelinePages([
+        [entry("evt-2", "2026-06-01T12:00:00Z"), entry("evt-1", "2026-06-01T13:00:00Z")],
+        [entry("evt-3", "2026-06-01T12:00:00Z"), entry("evt-2", "2026-06-01T12:00:00Z")],
+      ]);
+
+      expect(merged.map((event) => event.id)).toEqual(["evt-1", "evt-3", "evt-2"]);
     });
   });
 

@@ -32,6 +32,8 @@ describe('Mock Worker System', () => {
       await withCorrelationContext(context, async () => {
         const job = await queue.add('test-job', { data: 'test' });
         await worker.processJob(job.id);
+
+        expect(queue.getJob(job.id)).toBeUndefined();
       });
 
       expect(processor).toHaveBeenCalled();
@@ -162,8 +164,15 @@ describe('Mock Worker System', () => {
 
       await withCorrelationContext(context, async () => {
         const job = await queue.add('test-job', { data: 'test' });
-        job.attempts = 3; // At max attempts
+        job.attempts = 2; // Next failure reaches max attempts
         await worker.processJob(job.id).catch(() => {});
+
+        expect(queue.getJob(job.id)).toBeUndefined();
+        expect(queue.getDeadLetter(job.id)).toMatchObject({
+          id: job.id,
+          attempts: 3,
+          reason: 'Test error',
+        });
       });
 
       const consoleSpy = vi.spyOn(console, 'log');

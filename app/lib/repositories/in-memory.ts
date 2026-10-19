@@ -1,3 +1,4 @@
+import { makeDemoDateShifter } from "@/app/lib/demo-dates";
 import type {
   AppendOnlyStore,
   ExportAuditRecord,
@@ -9,6 +10,9 @@ import type {
 } from "@/app/lib/db";
 import type { ActivityEvent, ExportJob, Stream, User } from "@/app/types/openapi";
 import { createActivityTimelineStore, type ActivityTimelineStore, activityEventToTimelineEntry } from "@/app/lib/repositories/activity-timeline";
+
+// Keep seeded demo timestamps recent (no-op under Jest).
+const demoDate = makeDemoDateShifter("2026-04-28T12:00:00Z");
 
 // ---------------------------------------------------------------------------
 // Test-fixture seed data — all values are synthetic and carry no real
@@ -23,7 +27,8 @@ import { createActivityTimelineStore, type ActivityTimelineStore, activityEventT
     email: "fixture-user-1@example.test", // non-real domain
     display_name: "Ada Creative",
     avatar_url: null,
-    created_at: "2026-01-01T00:00:00Z",
+    created_at: demoDate("2026-01-01T00:00:00Z"),
+    last_seen: null,
   },
 ];
 
@@ -35,8 +40,8 @@ import { createActivityTimelineStore, type ActivityTimelineStore, activityEventT
     schedule: "Pays every 30 days",
     status: "active",
     nextAction: "pause",
-    createdAt: "2026-04-01T09:00:00Z",
-    updatedAt: "2026-04-28T10:30:00Z",
+    createdAt: demoDate("2026-04-01T09:00:00Z"),
+    updatedAt: demoDate("2026-04-28T10:30:00Z"),
     email: "fixture-user-1@example.test", // non-real domain
     label: "Design Retainer Q2",
     partnerId: "PARTNER-FIXTURE-1", // synthetic partner id
@@ -49,8 +54,8 @@ import { createActivityTimelineStore, type ActivityTimelineStore, activityEventT
     schedule: "Draft stream ready to launch",
     status: "draft",
     nextAction: "start",
-    createdAt: "2026-04-10T14:00:00Z",
-    updatedAt: "2026-04-28T11:00:00Z",
+    createdAt: demoDate("2026-04-10T14:00:00Z"),
+    updatedAt: demoDate("2026-04-28T11:00:00Z"),
     email: "fixture-user-2@example.test", // non-real domain
     memo: "April Support batch",
     token: "XLM",
@@ -62,8 +67,8 @@ import { createActivityTimelineStore, type ActivityTimelineStore, activityEventT
     schedule: "Ended yesterday with funds available",
     status: "ended",
     nextAction: "withdraw",
-    createdAt: "2026-04-15T08:00:00Z",
-    updatedAt: "2026-04-27T20:00:00Z",
+    createdAt: demoDate("2026-04-15T08:00:00Z"),
+    updatedAt: demoDate("2026-04-27T20:00:00Z"),
     token: "XLM",
   },
 ];
@@ -72,42 +77,42 @@ const initialActivity: ActivityEvent[] = [
   {
     id: "a7383234-4224-49dc-b868-0cdf37649fda",
     type: "wallet.connected",
-    timestamp: "2026-04-28T09:00:00Z",
+    timestamp: demoDate("2026-04-28T09:00:00Z"),
     description: "Wallet connected and authenticated.",
   },
   {
     id: "2b9d1d0c-bef4-46bc-a783-3073b28353fc",
     type: "stream.created",
     streamId: "stream-ada",
-    timestamp: "2026-04-01T09:00:00Z",
+    timestamp: demoDate("2026-04-01T09:00:00Z"),
     description: "Stream 'Design Retainer' created and set to draft.",
   },
   {
     id: "d1578871-4be9-4c6a-bef5-12b2b5836478",
     type: "stream.started",
     streamId: "stream-ada",
-    timestamp: "2026-04-01T09:05:00Z",
+    timestamp: demoDate("2026-04-01T09:05:00Z"),
     description: "Stream 'Design Retainer' activated.",
   },
   {
     id: "288f315d-5520-46e9-8acf-96994c87b786",
     type: "stream.created",
     streamId: "stream-kemi",
-    timestamp: "2026-04-10T14:00:00Z",
+    timestamp: demoDate("2026-04-10T14:00:00Z"),
     description: "Stream 'Kemi Onboarding Support' created as draft.",
   },
   {
     id: "3bea183d-c3b5-4e96-9fbe-804f3aee49e9",
     type: "stream.created",
     streamId: "stream-yusuf",
-    timestamp: "2026-04-15T08:00:00Z",
+    timestamp: demoDate("2026-04-15T08:00:00Z"),
     description: "Stream 'Yusuf QA Partnership' created.",
   },
   {
     id: "5ffa85da-27a4-4f7c-bde0-e5c067a28015",
     type: "stream.stopped",
     streamId: "stream-yusuf",
-    timestamp: "2026-04-27T20:00:00Z",
+    timestamp: demoDate("2026-04-27T20:00:00Z"),
     description: "Stream 'Yusuf QA Partnership' stopped and settled automatically.",
   },
 ];

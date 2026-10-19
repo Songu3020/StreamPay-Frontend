@@ -16,7 +16,48 @@ actions.
 The panel is reachable from the **View Contract Events** action on
 `/streams/{id}` (the stream detail page).
 
-## Event model
+## On-chain event scheme
+
+All stream-level events are emitted by the `streampay-stream` Soroban contract
+using a two-topic layout:
+
+```
+topic[0] = Symbol("stream")
+topic[1] = Symbol("<event_name>")   e.g. "created", "started", …
+data     = vec-encoded struct fields (see table below)
+```
+
+The `upgrade` event uses `("StreamPay", "upgraded")` as its topic pair.
+
+### Lifecycle event reference
+
+| Event name | Emitted by | Payload fields (in order) |
+|------------|-----------|--------------------------|
+| `created`  | `create_stream` | `stream_id`, `sender`, `recipient`, `token`, `total_amount`, `timestamp` |
+| `started`  | `start_stream`  | `stream_id`, `start_time`, `end_time`, `timestamp` |
+| `paused`   | `pause`         | `stream_id`, `sender`, `pause_time`, `timestamp` |
+| `resumed`  | `resume`        | `stream_id`, `sender`, `end_time`, `timestamp` |
+| `withdrawn`| `withdraw`      | `stream_id`, `recipient`, `amount`, `timestamp` |
+| `settled`  | `withdraw` (full drain) or `settle` | `stream_id`, `recipient`, `total_amount`, `timestamp` |
+| `cancelled`| `cancel_stream` | `stream_id`, `cancelled_by`, `returned_amount`, `released_amount`, `timestamp` |
+| `amended`  | `amend_stream`  | `stream_id`, `amended_by`, `new_rate_per_second`, `new_end_time`, `timestamp` |
+| `upgraded` | `upgrade`       | `new_wasm_hash` (single value, topics `"StreamPay"/"upgraded"`) |
+
+**Invariants:**
+- Events are emitted **after** the successful state mutation and any token transfer.
+- Failed calls (returning `Err`) emit **no events**.
+- When a full `withdraw` settles a stream, **two** events are emitted in sequence: `withdrawn` then `settled`.
+- `settle` emits only `settled` (one event).
+
+### Admin utility events
+
+| Event name | Emitted by | Topics | Payload |
+|------------|-----------|--------|---------|
+| `set_pause` | `set_paused` | `("stream", "set_pause")` | `(admin, paused, timestamp)` |
+| `set_admin` | `set_admin`  | `("stream", "set_admin")` | `(old_admin, new_admin, timestamp)` |
+| `set_token` | `set_token_allowed` | `("stream", "set_token")` | `(admin, token, allowed, timestamp)` |
+
+## Frontend event model
 
 Each event uses the `ContractEvent` shape exported from
 `app/components/EventTimeline.tsx`:
@@ -24,7 +65,7 @@ Each event uses the `ContractEvent` shape exported from
 | Field | Type | Notes |
 |-------|------|-------|
 | `id` | `string` | Stable key |
-| `type` | `ContractEventType` | `created`, `started`, `paused`, `resumed`, `withdrawn`, `settled`, `cancelled` |
+| `type` | `ContractEventType` | `created`, `started`, `paused`, `resumed`, `withdrawn`, `settled`, `cancelled`, `amended` |
 | `summary` | `string` | Human-readable description |
 | `timestamp` | `string` | ISO-8601 UTC; rendered relative via `Timestamp` |
 | `txHash` | `string` | Soroban transaction hash (copy + truncate via `CopyAddress`) |

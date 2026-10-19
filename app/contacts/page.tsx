@@ -28,10 +28,20 @@ export interface Contact {
 
 const CONTACTS_KEY = "streampay_contacts";
 
+// Sample address book shown on a visitor's first visit so the demo is populated.
+// Once the visitor saves, edits or deletes a contact their own list is persisted.
+// Not applied under Jest so the empty-state behaviour stays testable.
+const DEMO_CONTACTS: Contact[] = [
+  { id: "demo-ada", label: "Ada Creative Studio", address: "GAHJJJKMOKYE4RVPZEWZTKH5FVI4PA3VL7GK2LFNUBSGBV3JKAKZK7GQ", memo: "Design retainer, paid monthly", createdAt: "2026-04-01T09:00:00.000Z" },
+  { id: "demo-kemi", label: "Kemi Onboarding Support", address: "GBVZZ5QKXB4T2YXQXDXQ2ZQKXB4T2YXQXDXQ2ZQKXB4T2YXQXDXQ2ZQK", memo: "Weekly onboarding help", createdAt: "2026-04-10T11:00:00.000Z" },
+  { id: "demo-yusuf", label: "Yusuf QA Partnership", address: "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGYWDEAVQBMJ7WGNB55IAAQ", federationAddress: "yusuf*qa.example.com", createdAt: "2026-04-15T08:00:00.000Z" },
+];
+
 function loadContacts(): Contact[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(CONTACTS_KEY);
+    if (raw === null && process.env.NODE_ENV !== "test") return DEMO_CONTACTS;
     return raw ? (JSON.parse(raw) as Contact[]) : [];
   } catch {
     return [];
@@ -49,7 +59,9 @@ function persistContacts(contacts: Contact[]): void {
 const STELLAR_ACCOUNT_RE = /^G[A-Z2-7]{55}$/;
 
 function isValidStellarAddress(value: string): boolean {
-  return STELLAR_ACCOUNT_RE.test(value);
+  // Stellar addresses use base32 (RFC 4648) which is case-insensitive.
+  // Normalise to uppercase so the regex works for lowercase input.
+  return STELLAR_ACCOUNT_RE.test(value.toUpperCase());
 }
 
 // ─── ContactForm ──────────────────────────────────────────────────────────────
@@ -121,7 +133,8 @@ function ContactForm({
         setResolving(false);
       }
     } else if (isValidStellarAddress(trimmed)) {
-      setResolvedAddress(trimmed);
+      // Normalise to uppercase so stored addresses are canonical.
+      setResolvedAddress(trimmed.toUpperCase());
       setFederationAddress(undefined);
     } else {
       setResolvedAddress("");
@@ -374,13 +387,7 @@ interface ContactRowProps {
 function ContactRow({ contact, onEdit, onDelete }: ContactRowProps) {
   return (
     <article
-      className="activity-card"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr auto",
-        gap: "1rem",
-        alignItems: "center",
-      }}
+      className="activity-card contact-row"
       aria-label={`Contact: ${contact.label}`}
     >
       <div style={{ minWidth: 0 }}>
@@ -425,7 +432,7 @@ function ContactRow({ contact, onEdit, onDelete }: ContactRowProps) {
         )}
       </div>
 
-      <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+      <div className="contact-row__actions">
         <button
           type="button"
           className="button button--secondary"
@@ -625,6 +632,12 @@ export default function ContactsPage() {
             title="No contacts yet"
             description="Add a Stellar address with a label so you can find it quickly when setting up a payment stream."
             actionLabel="Add your first contact"
+            onAction={() => setAddOpen(true)}
+            guidanceSteps={[
+              "Click \"Add your first contact\" to get started",
+              "Enter a label (e.g. Alice Design Studio) and a Stellar address",
+              "Use federation addresses (user*domain.com) for automatic resolution",
+            ]}
           />
         ) : filtered.length === 0 ? (
           <p
@@ -635,7 +648,7 @@ export default function ContactsPage() {
               padding: "3rem 0",
             }}
           >
-            No contacts match <strong>{search}</strong>
+            No saved contacts match <strong>{search}</strong>
           </p>
         ) : (
           <section aria-label="Contact list">

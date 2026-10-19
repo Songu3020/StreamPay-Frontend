@@ -151,6 +151,11 @@ describe("rate-limit-config", () => {
       const result = getLimitForRoute("GET", "/api/identity/me");
       expect(result).toBe("read");
     });
+
+    it("should return read for live indexer status endpoint", () => {
+      const result = getLimitForRoute("GET", "/api/indexer/status");
+      expect(result).toBe("read");
+    });
   });
 });
 

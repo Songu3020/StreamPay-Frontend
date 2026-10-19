@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { streamsRateLimit } from "@/src/middleware/rateLimit";
 import { db, withLock } from "@/app/lib/db";
 import { withIdempotency, withdrawStore } from "@/app/lib/idempotency";
 import { getCorrelationContext, logger } from "@/app/lib/logger";
@@ -23,6 +24,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // Rate limit guard
+  const rateCheck = await streamsRateLimit(request, "POST", `/api/streams/${id}/withdraw`);
+  if (!rateCheck.allowed) {
+    return rateCheck.response;
+  }
+
+  // (original id extraction moved above)
   const actorAddress = getHeader(request, "Actor-Wallet-Address");
 
   // IDEMPOTENCY: Withdraw is non-idempotent by nature — this wrapper ensures retries return the original response without re-executing the withdrawal

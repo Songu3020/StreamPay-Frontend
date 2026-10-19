@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::single_match)]
 //! # Property-based tests for linear release math
 //!
 //! These tests use `proptest` to verify invariants that must hold for every
@@ -50,7 +51,7 @@ fn make_stream(
         duration: end_time.saturating_sub(start_time),
         last_update: start_time,
         status: StreamStatus::Active,
-        pause_time: 0,
+        paused_at: 0,
         total_paused_duration: 0,
     }
 }
@@ -76,12 +77,11 @@ fn safe_timestamp() -> impl Strategy<Value = u64> {
 
 /// A valid `(start, end)` pair with `end > start` and both in safe range.
 fn valid_time_range() -> impl Strategy<Value = (u64, u64)> {
-    safe_timestamp()
-        .prop_flat_map(|start| {
-            // end is at least start+1, at most start + 2^32 seconds (~136 years)
-            let end_range = (start + 1)..=start.saturating_add(u32::MAX as u64);
-            end_range.prop_map(move |end| (start, end))
-        })
+    safe_timestamp().prop_flat_map(|start| {
+        // end is at least start+1, at most start + 2^32 seconds (~136 years)
+        let end_range = (start + 1)..=start.saturating_add(u32::MAX as u64);
+        end_range.prop_map(move |end| (start, end))
+    })
 }
 
 // ── property tests ────────────────────────────────────────────────────────────
@@ -112,14 +112,50 @@ proptest! {
         now1 in safe_timestamp(),
         delta in 0_u64..=1_000_u64,
     ) {
-        let env = soroban_sdk::Env::default();
-        let stream = make_stream(&env, total, 0, start, end);
-        let now2 = now1.saturating_add(delta);
-        let v1 = release::vested_amount(&stream, now1);
-        let v2 = release::vested_amount(&stream, now2);
-        match (v1, v2) {
-            (Ok(a), Ok(b)) => prop_assert!(a <= b, "vested not monotone: {a} > {b} at {now1}..{now2}"),
-            _ => {} // overflow cases are fine to skip
+        let (env, _admin, sender, recipient, token) = setup_env();
+        let contract_id = env.register(Contract, ());
+        let client = ContractClient::new(&env, &contract_id);
+
+        let stream_id = client
+            .create_stream(&sender, &recipient, &token, &total_amount, &1_000, &(1_000 + duration));
+
+        // Advance to halfway point
+        env.ledger().set_timestamp(1_000 + duration / 2);
+
+        let withdrawable_before = client.withdrawable(&stream_id);
+        let stream_before = client.get_stream(&stream_id);
+
+        // Withdraw a fraction of the withdrawable amount
+        let withdraw_amount = withdrawable_before / withdraw_fraction as i128;
+        if withdraw_amount > 0 {
+            let _ = client.withdraw(&recipient, &stream_id, &withdraw_amount);
+
+            let stream_after = client.get_stream(&stream_id);
+            let withdrawable_after = client.withdrawable(&stream_id);
+
+            // Invariant: released_amount increased by withdrawn amount
+            prop_assert_eq!(
+                stream_after.released_amount,
+                stream_before.released_amount + withdraw_amount
+            );
+
+            // Invariant: released_amount <= total_amount
+            prop_assert!(
+                stream_after.released_amount <= total_amount,
+                "released_amount after withdrawal should not exceed total_amount"
+            );
+
+            // Invariant: withdrawable decreased appropriately
+            prop_assert!(
+                withdrawable_after <= withdrawable_before,
+                "withdrawable should decrease after withdrawal"
+            );
+
+            // Invariant: no overflow in calculations
+            prop_assert!(
+                stream_after.released_amount >= 0,
+                "released_amount should remain non-negative"
+            );
         }
     }
 

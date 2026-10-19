@@ -125,7 +125,12 @@ describe("ContactsPage — page shell", () => {
 
   it("renders the eyebrow label", () => {
     render(<ContactsPage />);
-    expect(screen.getByText(/contacts/i)).toBeInTheDocument();
+    const eyebrows = screen.getAllByText(/contacts/i);
+    expect(eyebrows.length).toBeGreaterThanOrEqual(1);
+    // The page-hero eyebrow should always be present
+    expect(
+      document.querySelector(".page-hero__eyebrow"),
+    ).toHaveTextContent("Contacts");
   });
 });
 
@@ -139,7 +144,41 @@ describe("ContactsPage — empty state", () => {
 
   it("does not show a count when the list is empty", () => {
     render(<ContactsPage />);
-    expect(screen.queryByText(/contact(s)?/i)).not.toBeInTheDocument();
+    // The count bar (aria-live region with "1 contact" etc.) should not appear
+    expect(
+      screen.queryByText(/^\d+ contact/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the add modal when the empty state CTA button is clicked", () => {
+    render(<ContactsPage />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /add your first contact/i }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: /add contact/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders getting-started guidance steps in the empty state", () => {
+    render(<ContactsPage />);
+    expect(
+      screen.getByText(/enter a label/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/federation addresses/i),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ContactsPage — localStorage edge cases", () => {
+  it("handles corrupted localStorage gracefully", () => {
+    store["streampay_contacts"] = "{invalid-json}";
+    render(<ContactsPage />);
+    // Should show the empty state, not crash
+    expect(
+      screen.getByRole("heading", { name: /no contacts yet/i }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -205,7 +244,7 @@ describe("ContactsPage — search / filter", () => {
     fireEvent.change(screen.getByRole("searchbox"), {
       target: { value: "zzz" },
     });
-    expect(screen.getByRole("status")).toHaveTextContent(/no contacts match/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/no saved contacts match/i);
   });
 
   it("shows filtered count vs total when a search is active", () => {
@@ -297,22 +336,23 @@ describe("ContactsPage — add contact modal", () => {
 
   it("saves a contact with a valid Stellar address to localStorage", async () => {
     render(<ContactsPage />);
-    fireEvent.click(screen.getByRole("button", { name: /\+ add contact/i }));
+    // The toolbar "+ Add contact" button is always visible
+    const addButton = screen.getByRole("button", { name: /\+ add contact/i });
+    fireEvent.click(addButton);
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/^label$/i), {
       target: { value: "Carol" },
     });
-    fireEvent.change(
-      within(dialog).getByLabelText(/stellar address or federation address/i),
-      {
-        target: {
-          value: "GCCC1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12345678",
-        },
-      },
+    const addressInput = within(dialog).getByLabelText(
+      /stellar address or federation address/i,
     );
-    fireEvent.blur(
-      within(dialog).getByLabelText(/stellar address or federation address/i),
-    );
+    // Use a valid 56-char Stellar address (G + 55 chars from A-Z,2-7)
+    const validAddress = `G${'A'.repeat(55)}`;
+    fireEvent.change(addressInput, {
+      target: { value: validAddress },
+    });
+    fireEvent.blur(addressInput);
+    // Submit the form
     fireEvent.click(
       within(dialog).getByRole("button", { name: /add contact/i }),
     );
@@ -385,6 +425,35 @@ describe("ContactsPage — federation address resolution", () => {
 });
 
 describe("ContactsPage — edit contact", () => {
+  it("pre-fills the address with the federation address when one exists", () => {
+    const fedContact: Contact = {
+      ...ALICE,
+      federationAddress: "alice*example.com",
+    };
+    seedContacts([fedContact]);
+    render(<ContactsPage />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /edit contact alice design/i }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByLabelText(/stellar address or federation address/i),
+    ).toHaveValue("alice*example.com");
+  });
+
+  it("pre-fills the address with the raw address when no federation address exists", () => {
+    seedContacts([ALICE]);
+    render(<ContactsPage />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /edit contact alice design/i }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByLabelText(/stellar address or federation address/i),
+    ).toHaveValue(
+      "GABC1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12345678",
+    );
+  });
   it("opens the edit modal when the Edit button is clicked", () => {
     seedContacts([ALICE]);
     render(<ContactsPage />);
@@ -438,7 +507,8 @@ describe("ContactsPage — delete contact", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /delete contact alice design/i }),
     );
-    expect(screen.getByText(/alice design/i)).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: /delete contact/i });
+    expect(within(dialog).getByText(/alice design/i)).toBeInTheDocument();
   });
 
   it("removes the contact after confirming deletion", async () => {

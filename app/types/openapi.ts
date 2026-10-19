@@ -1,17 +1,24 @@
-export type StreamStatus =
-  | "draft"
-  | "active"
-  | "paused"
-  | "ended"
-  | "withdrawn"
-  | "cancelled";
-export type StreamAction =
-  | "start"
-  | "pause"
-  | "stop"
-  | "settle"
-  | "withdraw"
-  | "cancel";
+export type * from "./openapi.generated";
+
+export type StreamStatus = "draft" | "active" | "paused" | "ended" | "withdrawn" | "cancelled";
+export type StreamAction = "start" | "pause" | "stop" | "settle" | "withdraw" | "cancel";
+export type WithdrawalState = "pending" | "succeeded" | "failed";
+
+export interface WithdrawalStatus {
+  state: WithdrawalState;
+  requestedAt: string;
+  lastCheckedAt: string;
+  attempts: number;
+  settlementTxHash?: string;
+  confirmedTxHash?: string;
+  horizonCursor?: string;
+  failureCode?: string;
+}
+
+export type * from "./openapi.generated";
+
+export type StreamStatus = "draft" | "active" | "paused" | "ended" | "withdrawn" | "cancelled";
+export type StreamAction = "start" | "pause" | "stop" | "settle" | "withdraw" | "cancel";
 export type WithdrawalState = "pending" | "succeeded" | "failed";
 
 export interface WithdrawalStatus {
@@ -78,6 +85,11 @@ export interface Stream {
    */
   token: string;
   /**
+   * Total amount locked in escrow when the stream was created (raw i128 units).
+   * Required for the cancel-stream refund preview split.
+   */
+  totalAmount?: string;
+  /**
    * Present only on cancelled streams. Contains the full refund-split
    * breakdown so callers can verify the escrow-conservation invariant.
    */
@@ -118,6 +130,7 @@ export interface User {
   display_name: string;
   avatar_url: string | null;
   created_at: string;
+  last_seen: string | null;
 }
 
 export interface ApiError {
@@ -162,6 +175,7 @@ export interface ActivityEvent {
   streamId?: string;
   timestamp: string;
   description: string;
+  isDeleted?: boolean;
 }
 
 export type ExportJobStatus = "pending" | "ready" | "failed" | "expired";

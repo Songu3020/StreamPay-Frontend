@@ -3,7 +3,15 @@
  *
  * SSE endpoint that streams live indexer status updates.
  * Emits an "indexer_status" event every 5 seconds with ledger cursor,
- * ingestion lag, and queue depth.
+ * ingestion lag, queue depth, and — most importantly — a deterministic
+ * `status` value derived from the pure state machine in `lib/indexerStatus.ts`
+ * (loading / syncing / synced / stalled / stopped / error / retrying).
+ *
+ * The reported status is **deterministic**: it is a pure function of the real
+ * cursor state, the operator-controlled circuit breaker, and the current time.
+ * Staleness is the explicit `stale` flag so dashboards and operators can
+ * distinguish a healthy-but-catching-up indexer from one whose cursor has
+ * silently stopped advancing.
  *
  * Clients should use EventSource:
  *   const es = new EventSource('/api/indexer/status');
@@ -13,24 +21,13 @@
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-interface IndexerStatus {
-  ledgerCursor: number;
-  lagMs: number;
-  queueDepth: number;
-  syncedAt: string;
-}
+import { applyRateLimit } from "@/src/middleware/rateLimit";
+import { getIndexerStatus } from "./status";
 
-function getIndexerStatus(): IndexerStatus {
-  // In production this would read from the real indexer state store.
-  return {
-    ledgerCursor: 50_000_000 + Math.floor(Math.random() * 1000),
-    lagMs: Math.floor(Math.random() * 3000),
-    queueDepth: Math.floor(Math.random() * 50),
-    syncedAt: new Date().toISOString(),
-  };
-}
+export async function GET(request: Request) {
+  const rateLimited = await applyRateLimit(request, "indexer/status", "GET");
+  if (rateLimited) return rateLimited;
 
-export async function GET() {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({

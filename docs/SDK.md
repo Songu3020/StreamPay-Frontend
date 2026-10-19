@@ -3,6 +3,23 @@
 `lib/sdk` exports a small TypeScript client for partners that need REST helpers
 and live stream updates without importing Next.js route internals.
 
+## OpenAPI Contract
+
+The canonical, hand-edited API specification is [`openapi.json`](../openapi.json).
+`app/types/openapi.generated.ts` is generated from that file, and
+`app/types/openapi.ts` re-exports those API types alongside the app's domain
+types. Do not edit the generated file or maintain a second OpenAPI spec.
+
+After editing `openapi.json`, regenerate the TypeScript declarations with:
+
+```sh
+npm run openapi:generate
+```
+
+Check generated files for drift with `npm run openapi:check`. `npm run smoke`
+performs this check before its other smoke checks and fails if the declarations
+are stale.
+
 ## Create a Client
 
 ```ts
@@ -23,6 +40,23 @@ Every REST request sends:
 
 API error envelopes are raised as `StreamPaySdkError` with `code`, `status`,
 `requestId`, and optional `details`.
+
+### Diagnostics privacy
+
+`details` is intended for diagnostics, so it is **redacted before it leaves the
+SDK**. Error responses commonly echo the submitted request body, which can
+contain credentials (tokens, secrets, signing keys, signatures, seeds,
+mnemonics, …). The SDK applies a deterministic, least-privilege redaction
+(`lib/sdk/redact.ts`) to any body captured into `StreamPaySdkError.details`:
+
+- Sensitive field names (`token`, `secret`, `password`, `privateKey`,
+  `api_key`, `signature`, `seed`, …) are replaced with `[REDACTED]`.
+- Stellar secret seeds (`S…`) and PEM private-key blocks are redacted even
+  under non-sensitive field names.
+- Non-sensitive fields (recipient addresses, rates, error messages, field
+  errors) are preserved so failures remain diagnosable.
+- Redaction is pure and total: it never throws, never mutates the error
+  payload, and is deterministic for identical input.
 
 ## REST Helpers
 

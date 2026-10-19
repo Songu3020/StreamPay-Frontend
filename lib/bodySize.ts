@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveRequestId } from './requestId';
 
 /**
  * Body size limit configuration for different route categories.
  *
  * Route scoping (only write methods: POST, PUT, PATCH):
- *   - /api/v2/streams and /api/v2/streams/*  → 256 KB (MAX_STREAM_BODY_BYTES)
  *   - /api/webhooks and /api/webhooks/*       → 1 MB  (MAX_WEBHOOK_BODY_BYTES)
- *   - all other paths                         → no middleware-level cap
+ *   - all other /api/* paths                   → 256 KB (MAX_STREAM_BODY_BYTES)
+ *   - non-API paths                            → no middleware-level cap
  *
  * The check is O(1): reads Content-Length only; bodies without this header
  * are allowed through and left to the application layer.
  *
  * Operators may override the defaults via environment variables:
- *   - MAX_STREAM_BODY_BYTES (stream routes, default 256 KB)
+ *   - MAX_STREAM_BODY_BYTES (default limit for API routes, default 256 KB)
  *   - MAX_WEBHOOK_BODY_BYTES (webhook routes, default 1 MB)
  */
 
@@ -87,8 +88,8 @@ export function isStreamPath(pathname: string): boolean {
  *
  * Route categories:
  *   - /api/webhooks (exact) or /api/webhooks/* → limits.webhook (1 MB default)
- *   - /api/v2/streams (exact) or /api/v2/streams/* → limits.default (256 KB default)
- *   - all other paths → null (no middleware-level cap)
+ *   - all other /api/* paths                    → limits.default (256 KB default)
+ *   - non-API paths                             → null (no middleware-level cap)
  *
  * @param pathname - Request pathname
  * @param limits - Limit configuration with default and webhook values
@@ -99,7 +100,7 @@ export function getBodySizeLimit(
   limits: { default: number; webhook: number }
 ): number | null {
   if (isWebhookPath(pathname)) return limits.webhook;
-  if (isStreamPath(pathname)) return limits.default;
+  if (pathname.startsWith('/api/')) return limits.default;
   return null;
 }
 
@@ -199,8 +200,7 @@ export function checkRequestBodySize(
   }
 
   if (contentLength > maxBytes) {
-    const requestId = (request.headers.get('x-request-id') as string | null) ?? 
-                     `req_${Date.now().toString(36)}`;
+    const requestId = resolveRequestId(request.headers);
     return createBodySizeTooLargeResponse(contentLength, maxBytes, requestId);
   }
 

@@ -51,11 +51,11 @@ use streampay_stream::{Contract, ContractClient};
 
 /// All state shared by multiple benchmark groups.
 struct Fixture {
-    env:       Env,
-    admin:     Address,
-    sender:    Address,
+    env: Env,
+    admin: Address,
+    sender: Address,
     recipient: Address,
-    token:     Address,
+    token: Address,
 }
 
 /// Construct a clean environment with one token and funded sender.
@@ -70,15 +70,23 @@ fn setup() -> Fixture {
     // Anchor the clock at a stable value so time-based logic is deterministic.
     env.ledger().set_timestamp(1_000);
 
-    let admin     = Address::generate(&env);
-    let sender    = Address::generate(&env);
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
-    let token     = env.register_stellar_asset_contract_v2(admin.clone()).address();
+    let token = env
+        .register_stellar_asset_contract_v2(admin.clone())
+        .address();
 
     // Fund sender with enough tokens for any benchmark in this file.
     StellarAssetClient::new(&env, &token).mint(&sender, &100_000_000);
 
-    Fixture { env, admin, sender, recipient, token }
+    Fixture {
+        env,
+        admin,
+        sender,
+        recipient,
+        token,
+    }
 }
 
 /// Register the contract and return an initialised client.
@@ -111,8 +119,8 @@ fn bench_initialize(c: &mut Criterion) {
     let mut g = c.benchmark_group("initialize");
     g.bench_function("initialize", |b| {
         b.iter(|| {
-            let f      = setup();
-            let id     = f.env.register(Contract, ());
+            let f = setup();
+            let id = f.env.register(Contract, ());
             let client = ContractClient::new(&f.env, &id);
             client.initialize(black_box(&f.admin))
         });
@@ -127,16 +135,22 @@ fn bench_init_with_token_allowlist(c: &mut Criterion) {
     let mut g = c.benchmark_group("init_with_token_allowlist");
     g.bench_function("three_tokens", |b| {
         b.iter(|| {
-            let f  = setup();
+            let f = setup();
             // Create two extra tokens beyond the one in the fixture.
-            let t2 = f.env.register_stellar_asset_contract_v2(f.admin.clone()).address();
-            let t3 = f.env.register_stellar_asset_contract_v2(f.admin.clone()).address();
+            let t2 = f
+                .env
+                .register_stellar_asset_contract_v2(f.admin.clone())
+                .address();
+            let t3 = f
+                .env
+                .register_stellar_asset_contract_v2(f.admin.clone())
+                .address();
             let mut tokens = soroban_sdk::Vec::new(&f.env);
             tokens.push_back(f.token.clone());
             tokens.push_back(t2);
             tokens.push_back(t3);
 
-            let id     = f.env.register(Contract, ());
+            let id = f.env.register(Contract, ());
             let client = ContractClient::new(&f.env, &id);
             client.init_with_token_allowlist(black_box(&f.admin), black_box(&tokens))
         });
@@ -151,14 +165,14 @@ fn bench_set_paused(c: &mut Criterion) {
     let mut g = c.benchmark_group("set_paused");
     g.bench_function("pause", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
             client.set_paused(black_box(&f.admin), black_box(&true))
         });
     });
     g.bench_function("unpause", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
             client.set_paused(&f.admin, &true); // pre-condition
             client.set_paused(black_box(&f.admin), black_box(&false))
@@ -174,8 +188,8 @@ fn bench_set_admin(c: &mut Criterion) {
     let mut g = c.benchmark_group("set_admin");
     g.bench_function("set_admin", |b| {
         b.iter(|| {
-            let f         = setup();
-            let client    = make_client(&f);
+            let f = setup();
+            let client = make_client(&f);
             let new_admin = Address::generate(&f.env);
             client.set_admin(black_box(&f.admin), black_box(&new_admin))
         });
@@ -190,14 +204,14 @@ fn bench_set_token_allowed(c: &mut Criterion) {
     let mut g = c.benchmark_group("set_token_allowed");
     g.bench_function("allow", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
             client.set_token_allowed(black_box(&f.admin), black_box(&f.token), black_box(&true))
         });
     });
     g.bench_function("block", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
             client.set_token_allowed(black_box(&f.admin), black_box(&f.token), black_box(&false))
         });
@@ -212,7 +226,7 @@ fn bench_set_max_streams_per_sender(c: &mut Criterion) {
     let mut g = c.benchmark_group("set_max_streams_per_sender");
     g.bench_function("set_max_streams_per_sender", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
             client.set_max_streams_per_sender(black_box(&f.admin), black_box(&20u64))
         });
@@ -228,7 +242,7 @@ fn bench_set_max_streams_per_sender(c: &mut Criterion) {
 fn bench_max_streams_per_sender(c: &mut Criterion) {
     let mut g = c.benchmark_group("max_streams_per_sender");
     g.bench_function("max_streams_per_sender", |b| {
-        let f      = setup();
+        let f = setup();
         let client = make_client(&f);
         b.iter(|| client.max_streams_per_sender());
     });
@@ -241,12 +255,12 @@ fn bench_max_streams_per_sender(c: &mut Criterion) {
 fn bench_sender_stream_count(c: &mut Criterion) {
     let mut g = c.benchmark_group("sender_stream_count");
     g.bench_function("zero_streams", |b| {
-        let f      = setup();
+        let f = setup();
         let client = make_client(&f);
         b.iter(|| client.sender_stream_count(black_box(&f.sender)));
     });
     g.bench_function("one_stream", |b| {
-        let f      = setup();
+        let f = setup();
         let client = make_client(&f);
         make_stream(&f, &client);
         b.iter(|| client.sender_stream_count(black_box(&f.sender)));
@@ -260,9 +274,9 @@ fn bench_sender_stream_count(c: &mut Criterion) {
 fn bench_get_stream(c: &mut Criterion) {
     let mut g = c.benchmark_group("get_stream");
     g.bench_function("get_stream", |b| {
-        let f      = setup();
+        let f = setup();
         let client = make_client(&f);
-        let id     = make_stream(&f, &client);
+        let id = make_stream(&f, &client);
         b.iter(|| client.get_stream(black_box(&id)));
     });
     g.finish();
@@ -277,17 +291,17 @@ fn bench_withdrawable(c: &mut Criterion) {
     let mut g = c.benchmark_group("withdrawable");
 
     g.bench_function("at_midpoint", |b| {
-        let f      = setup();
+        let f = setup();
         let client = make_client(&f);
-        let id     = make_stream(&f, &client);
+        let id = make_stream(&f, &client);
         f.env.ledger().set_timestamp(1_600); // midpoint of 1_100..2_100
         b.iter(|| client.withdrawable(black_box(&id)));
     });
 
     g.bench_function("at_end", |b| {
-        let f      = setup();
+        let f = setup();
         let client = make_client(&f);
-        let id     = make_stream(&f, &client);
+        let id = make_stream(&f, &client);
         f.env.ledger().set_timestamp(2_200); // past end_time
         b.iter(|| client.withdrawable(black_box(&id)));
     });
@@ -301,17 +315,17 @@ fn bench_stream_balance(c: &mut Criterion) {
     let mut g = c.benchmark_group("stream_balance");
 
     g.bench_function("at_midpoint", |b| {
-        let f      = setup();
+        let f = setup();
         let client = make_client(&f);
-        let id     = make_stream(&f, &client);
+        let id = make_stream(&f, &client);
         f.env.ledger().set_timestamp(1_600);
         b.iter(|| client.stream_balance(black_box(&id)));
     });
 
     g.bench_function("at_end", |b| {
-        let f      = setup();
+        let f = setup();
         let client = make_client(&f);
-        let id     = make_stream(&f, &client);
+        let id = make_stream(&f, &client);
         f.env.ledger().set_timestamp(2_200);
         b.iter(|| client.stream_balance(black_box(&id)));
     });
@@ -330,7 +344,7 @@ fn bench_create_stream(c: &mut Criterion) {
     let mut g = c.benchmark_group("create_stream");
     g.bench_function("create_stream", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
             client.create_stream(
                 black_box(&f.sender),
@@ -357,7 +371,7 @@ fn bench_start_stream(c: &mut Criterion) {
     let mut g = c.benchmark_group("start_stream");
     g.bench_function("start_stream", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
 
             // Create with start_time well in the future so the stream lands
@@ -397,9 +411,9 @@ fn bench_withdraw(c: &mut Criterion) {
 
     g.bench_function("partial", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             // Advance to midpoint so 500 tokens are vested.
             f.env.ledger().set_timestamp(1_600);
             client.withdraw(black_box(&id), black_box(&250i128)) // withdraw half of vested
@@ -408,9 +422,9 @@ fn bench_withdraw(c: &mut Criterion) {
 
     g.bench_function("full_settle", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             // Advance past end_time so the full amount is vested.
             f.env.ledger().set_timestamp(2_200);
             client.withdraw(black_box(&id), black_box(&1_000i128))
@@ -427,9 +441,9 @@ fn bench_pause(c: &mut Criterion) {
     let mut g = c.benchmark_group("pause");
     g.bench_function("pause", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             f.env.ledger().set_timestamp(1_600); // mid-stream
             client.pause(black_box(&id))
         });
@@ -445,9 +459,9 @@ fn bench_resume(c: &mut Criterion) {
     let mut g = c.benchmark_group("resume");
     g.bench_function("resume", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             // Pause first (setup, not measured).
             f.env.ledger().set_timestamp(1_600);
             client.pause(&id);
@@ -469,9 +483,9 @@ fn bench_settle(c: &mut Criterion) {
 
     g.bench_function("full_payout", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             f.env.ledger().set_timestamp(2_200); // past end_time
             client.settle(black_box(&id))
         });
@@ -479,9 +493,9 @@ fn bench_settle(c: &mut Criterion) {
 
     g.bench_function("zero_payout_already_withdrawn", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             // Withdraw everything first.
             f.env.ledger().set_timestamp(2_200);
             client.withdraw(&id, &1_000i128);
@@ -503,9 +517,9 @@ fn bench_cancel_stream(c: &mut Criterion) {
 
     g.bench_function("mid_stream", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             f.env.ledger().set_timestamp(1_600); // midpoint
             client.cancel_stream(black_box(&id))
         });
@@ -513,9 +527,9 @@ fn bench_cancel_stream(c: &mut Criterion) {
 
     g.bench_function("at_start", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             f.env.ledger().set_timestamp(1_100); // right at start_time, nothing vested
             client.cancel_stream(black_box(&id))
         });
@@ -532,9 +546,9 @@ fn bench_amend_stream(c: &mut Criterion) {
     let mut g = c.benchmark_group("amend_stream");
     g.bench_function("extend_end_time", |b| {
         b.iter(|| {
-            let f      = setup();
+            let f = setup();
             let client = make_client(&f);
-            let id     = make_stream(&f, &client);
+            let id = make_stream(&f, &client);
             // Extend end_time by 500 s.
             client.amend_stream(black_box(&id), black_box(&10i128), black_box(&2_600u64))
         });

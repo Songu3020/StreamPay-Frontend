@@ -4,7 +4,7 @@
  * Unit tests for the fee-bump logic in `lib/feeBump.ts`.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { isFeeRelatedFailure, maybeFeeBump } from "@/lib/feeBump";
 import type { Stream } from "@/app/types/openapi";
 
@@ -13,13 +13,11 @@ import type { Stream } from "@/app/types/openapi";
 function makeStream(overrides: Partial<Stream> = {}): Stream {
   return {
     id: "stream-1",
-    sender: "GSENDER",
-    recipient: "GRECIPIENT",
-    tokenAddress: "CTOKEN",
-    amount: "1000",
-    startTime: new Date().toISOString(),
-    endTime: new Date(Date.now() + 60_000).toISOString(),
+    recipient: "GRECIPIENT000000000000000000000000000000000000000000000",
+    rate: "100",
+    schedule: "linear",
     status: "ended",
+    token: "XLM",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     settlementTxHash: "abc123",

@@ -44,6 +44,7 @@ export class MockWorker {
 
       try {
         await this.processor(job);
+        this.queue.completeJob(job.id);
         
         logger.info('Job processed successfully', {
           job_id: job.id,
@@ -62,6 +63,10 @@ export class MockWorker {
         });
 
         if (job.attempts >= job.maxAttempts) {
+          this.queue.deadLetterJob(
+            job.id,
+            error instanceof Error ? error.message : 'Unknown error',
+          );
           logger.error('Job max retries exceeded', {
             job_id: job.id,
             queue_name: job.queueName,

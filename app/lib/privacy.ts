@@ -1,6 +1,3 @@
-import { Stream } from "@/app/types/openapi";
-import { getStore } from "./db";
-
 export function redact(data: any): any {
   if (typeof data !== 'object' || data === null) return data;
   const redacted = { ...data };
@@ -14,6 +11,8 @@ export function redact(data: any): any {
   }
   return redacted;
 }
+import { Stream, User } from "@/app/types/openapi";
+import { getStore } from "./db";
 
 /**
  * Retention period: 7 years in milliseconds.
